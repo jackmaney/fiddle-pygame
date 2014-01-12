@@ -10,18 +10,18 @@ windowSize = (1024, 768)
 
 screen = pygame.display.set_mode(windowSize)
 
-numberOfBalls = 200
+numberOfBalls = 15
 
 ball_list = []
 
 position = [random.randint(0,windowSize[0] - 1),random.randint(0,windowSize[1] - 1)]
-radius = random.randint(1,5)
+radius = random.randint(10,25)
 color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
 ball_list.append(Ball(screen,position,radius,color=color))
 
 while len(ball_list) < numberOfBalls:
 	position = [random.randint(0,windowSize[0] - 1),random.randint(0,windowSize[1] - 1)]
-	radius = random.randint(1,5)
+	radius = random.randint(10,25)
 	color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
 	ball = Ball(screen,position,radius,color=color)
 	append = True

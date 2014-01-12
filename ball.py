@@ -32,6 +32,12 @@ class Ball:
 				self.position[1] + int(math.ceil(self.rect_size[1]/2.0))
 			]
 
+	def distanceFromCenters(self,other):
+		deltaX = self.position[0] - other.position[0]
+		deltaY = self.position[1] - other.position[1]
+
+		return math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
 	def move_check(self):
 
 		newXY = [self.position[0] + self.velocity[0],self.position[1] + self.velocity[1]]
@@ -88,7 +94,9 @@ class Ball:
 
 	# Returns a 2-tuple to indicate overlap on x's and y's
 	def intersects(self,other):
-		return self.intersectX(other) * self.intersectY(other)
+		# return self.intersectX(other) * self.intersectY(other)
+		
+		return self.distanceFromCenters(other) <= self.radius + other.radius
 
 
 	def move(self):
