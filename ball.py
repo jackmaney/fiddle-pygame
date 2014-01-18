@@ -1,159 +1,251 @@
 import random
 import math
 import pygame
-
+import numpy as np
 
 
 class Ball:
-	def __init__(self,surface,position,radius
-			,color=(255,255,255)
-			,velocity=None):
 
-		if radius < 0:
-			raise Exception("Radius cannot be negative")
+    def __init__(self, screen, position, radius, color=(255, 255, 255), velocity=None):
 
-		self.rect_size = (2 * radius + 1, 2 * radius + 1)
-		self.color = color
-		self.position = position
+        if radius < 0:
+            raise Exception("Radius cannot be negative")
 
-		if velocity is not None:
-			self.velocity = velocity
-		else:
-			self.velocity = [random.randint(-20,20),random.randint(-20,20)]
+        self.radius = radius
 
-		self.surface = surface
-		self.radius = radius
+        self.rect_size = np.array([2 * radius + 1, 2 * radius + 1], np.int32)
+        self.color = color
+        self.position = np.array(position, np.int32)
 
-		self.windowSize = self.surface.get_size()
+        if velocity is not None:
+            self.velocity = np.array(velocity, np.int32)
+        else:
+            self.velocity = np.array(
+                [random.randint(-20, 20), random.randint(-20, 20)], np.int32
+            )
 
-	def center(self):
-		return [
-				self.position[0] + int(math.ceil(self.rect_size[0]/2.0)), 
-				self.position[1] + int(math.ceil(self.rect_size[1]/2.0))
-			]
+        self.screen = screen
+        self.screen_size = np.array(self.screen.get_size(), np.int32)
 
-	def distanceFromCenters(self,other):
-		deltaX = self.position[0] - other.position[0]
-		deltaY = self.position[1] - other.position[1]
+    def center(self):
+        return self.position + self.radius + 1
 
-		return math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    def distanceBetweenCenters(self, other):
+        return math.sqrt(np.vectorize(lambda x: x * x)(self.center() - other.center()).sum())
 
-	def move_check(self):
+    def outOfBounds(self, pos=None):
 
-		newXY = [self.position[0] + self.velocity[0],self.position[1] + self.velocity[1]]
-		newVelocity = self.velocity
+        position = None
+        if pos is None:
+            position = self.position
+        else:
+            position = pos
 
-		if newXY[0] < 0:
-			newXY[0] = 0
-			newVelocity[0] *= -1
+        return position[0] < 0 or position[1] < 0 or \
+            position[0] + self.rect_size[0] > self.screen_size[0] or \
+            position[1] + self.rect_size[1] > self.screen_size[1]
 
-		if newXY[0] + self.rect_size[0] >= self.windowSize[0]:
-			newXY[0] = self.windowSize[0] - self.rect_size[0]
-			newVelocity[0] *= -1
+    def keepInWindow(self):
 
-		if newXY[1] < 0:
-			newXY[1] = 0
-			newVelocity[1] *= -1
+        x, y = self.position
 
-		if newXY[1] + self.rect_size[1] >= self.windowSize[1]:
-			newXY[1] = self.windowSize[1] - self.rect_size[1]
-			newVelocity[1] *= -1
+        if self.position[0] < 0:
+            x = 0
+            self.velocity[0] *= -1
+        elif self.position[0] + self.rect_size[0] > self.screen_size[0]:
+            x = self.screen_size[0] - self.rect_size[0]
+            self.velocity[0] *= -1
 
-		return (newXY,newVelocity)
+        if self.position[1] < 0:
+            y = 0
+            self.velocity[1] *= -1
+        elif self.position[1] + self.rect_size[1] > self.screen_size[1]:
+            y = self.screen_size[1] - self.rect_size[1]
+            self.velocity[1] *= -1
 
-	# Returns 0 if no overlap in x-direction, -1 if self is to the left, 1 if self is to the right
-	def intersectX(self,other):
-		
-		# Check if self overlaps and is on the left of other
-		if self.position[0] <= other.position[0] and \
-			self.position[0] + self.rect_size[0] >= other.position[0]:
-			return -1
+        self.position = np.array([x, y], np.int32)
 
-		# And check the right side
-		if self.position[0] >= other.position[0] and \
-			self.position[0] + self.rect_size[0] <= other.position[0] + other.rect_size[0]:
-			return 1
+    def intersects(self, other):
+        return self.distanceBetweenCenters(other) <= self.radius + other.radius
 
-		return 0
+    def changeDirection(self, other):
 
-	# Same deal, remembering that y=0 is at the top!
-	# Returns 1 if self is above other and overlapping
-	# Returns -1 if self is below other and overlapping
-	# Otherwise returns 0
-	def intersectY(self,other): 
+        dist = self.distanceBetweenCenters(other)
 
-		if self.position[1] <= other.position[1] and \
-			self.position[1] + self.rect_size[1] >= other.position[1] - other.rect_size[1]:
-			return 1
+        # (I used http://stackoverflow.com/a/3349134 to double-check
+        # my reasoning and calculations here)
+        #
+        # Now is where we need a bit of a mathematical explanation.
+        # Denote self.center() and other.center() by C1 and C2.
+        # Let d be the distance from C1 to C2, and let the radii of
+        # self and other be r1 and r2, respectively.
+        #
+        # Since this method is only called when there's an intersection,
+        # we'll assume that d <= r1 + r2. Since the tangent case is easy
+        # (no position change, just a velocity change), we'll assume that
+        # d < r1 + r2 so that we have two points of intersection.
+        #
+        # Let L denote the line through these points of intersection. We know
+        # that L is orthogonal to the line between C1 and C2. We seek the
+        # point of intersection of these lines, which I'll call Q.
+        #
+        # Let a denote the distance from C1 to Q, let b denote the distance
+        # from C2 to Q, and let h denote the distance from Q to either of the
+        # intersection points. Pythagoras tells us that:
+        #
+        #       a^2 + h^2 == r1^2 and b^2 + h^2 == r2^2.
+        #
+        # Therefore,
+        #
+        #       a^2 - b^2 == r1^2 - r2^2
+        #
+        # and taking advantage of the fact that d == a + b, we have
+        #
+        #       a^2 - (d - a)^2 == r1^2 - r2^2
+        #
+        # which simplifies to:
+        #
+        #       -d^2 + 2*a*d == r1^2 - r2^2
+        #
+        # and solving for a, we get:
+        #
+        #       a == (r1^2 - r2^2 + d^2) / 2*d
+        #
+        # We can play a similar trick and get
+        #
+        #       b == (r2^2 - r1^2 + d^2) / 2*d
+        #
+        # In particular, this means that
+        #
+        #   Q = C1 + a(C2 - C1) / d
+        #
+        # All that we have to do now is move each of the circles away from each other
+        # along the line between the centers, and in the amounts that are the distances
+        # between Q and the edges of each circle (which are r1 - a and r2 - b, respectively).
+        #
+        # So, we move C1 to C1 + (r1 - a)*(C2 - C1)/r1 and C2 to C2 + (r2 - b)*(C1 - C2)/r2
+        #
+        # Note that we've also assumed that neither of the centers are included in the other circle
+        # (ie d > max(r1,r2)). We'll deal with this case--and the case of d == r1 + r2 (ie one point of
+        # intersection) below.
+        #
 
-		if self.position[1] >= other.position[1] and \
-			self.position[1] + self.rect_size[1] <= other.position[1] + other.rect_size[1]:
-			return -1
+        d = self.distanceBetweenCenters(other)
+        r1 = self.radius
+        r2 = other.radius
 
-		return 0
+        # First, though, a really dumb case...
+        if d == 0:
+            # Move self to the left, or if we can't, move self to the right
+            if self.position[0] > r1 + r2:
+                self.position[0] -= r1 + r2
+            else:
+                self.position[0] += r1 + r2
 
-	# Returns a 2-tuple to indicate overlap on x's and y's
-	def intersects(self,other):
-		# return self.intersectX(other) * self.intersectY(other)
-		
-		return self.distanceFromCenters(other) <= self.radius + other.radius
+        else:
 
+            C1 = self.center().astype(float)
+            C2 = other.center().astype(float)
+            a = float(r1 * r1 - r2 * r2 + d * d) / float(2 * d)
+            b = float(r2 * r2 - r1 * r1 + d * d) / float(2 * d)
 
-	def move(self):
-		
-		newXY, newVelocity = self.move_check()
+            positionCandidate = self.position
+            otherPositionCandidate = other.position
 
-		self.position = newXY
-		self.velocity = newVelocity
+            if d > r1 and d > r2:
 
+                positionCandidate = np.around(
+                    C1 + (r1 - a) * (C2 - C1) / r1).astype(np.int32)
+                otherPositionCandidate = np.around(
+                    C2 + (r2 - b) * (C1 - C2) / r2).astype(np.int32)
 
-	def draw(self):
-		pygame.draw.circle(self.surface,self.color,self.center(),self.radius)
+                # Are these candidates in bounds?
 
-	def reverse_direction(self):
-		self.velocity[0] *= -1
-		self.velocity[1] *= -1
+                if self.outOfBounds(otherPositionCandidate):
+                    # Move self the extra mile
+                    otherPositionCandidate = other.position
+                    positionCandidate += np.around((r2 - b)
+                                                   * (C2 - C1) / r2).astype(np.int32)
+                elif self.outOfBounds(positionCandidate):
+                    # Likewise...
+                    positionCandidate = self.position
+                    otherPositionCandidate += np.around((r1 - a)
+                                                        * (C1 - C2) / r1).astype(np.int32)
+
+            elif d > r1:
+                # If this is the case, then d <= r2, which means that C2 is inside of
+                # the ball for self. We'll cheat and move other the hell out of
+                # dodge.
+
+                otherPositionCandidate = np.around(
+                    C2 + (d - r1 + r2) * (C1 - C2) / r2).astype(np.int32)
+
+                if self.outOfBounds(otherPositionCandidate):
+                    # Unless we can't...mumble grumble...
+                    otherPositionCandidate = other.position
+
+                    self.position = np.around(
+                        C1 + (d - r2 + r1) * (C2 - C1) / r1).astype(np.int32)
+
+            elif d > r2:
+                # Similar case: d <= r1, so move self the hell out of dodge
+
+                positionCandidate = np.around(
+                    C1 + (d - r2 + r1) * (C2 - C1) / r1).astype(np.int32)
+
+                if self.outOfBounds(positionCandidate):
+                    positionCandidate = self.position
+                    otherPositionCandidate = np.around(
+                        C2 + (d - r1 + r2) * (C1 - C2) / r2).astype(np.int32)
+            else:
+                # If d <= r1 and d <= r2, then C1 is inside other and C2 is inside self
+                # Again, we'll cheat and move self out of dodge.
+
+                positionCandidate = np.around(
+                    C1 + (r2 - d + r1) * (C2 - C1) / r1).astype(np.int32)
+
+                if self.outOfBounds(positionCandidate):
+                    positionCandidate = self.position
+                    otherPositionCandidate = np.around(
+                        C2 + (r1 - d + r2) * (C1 - C2) / r2).astype(np.int32)
+
+            self.position = positionCandidate
+            other.position = otherPositionCandidate
+
+        # TODO: Make more realistic
+
+        self.velocity *= -1
+        other.velocity *= -1
+
+    def render(self):
+        pygame.draw.circle(self.screen, self.color,
+                           self.center(), self.radius)
+
+    def move(self):
+        self.position += self.velocity
 
 
 class BallList(list):
-	def __init__(self,ball_list):
-		for ball in ball_list:
-			if not isinstance(ball,Ball):
-				raise Exception("Must pass list of Ball objects!")
-			self.append(ball)
 
-	def move(self):
+    def __init__(self, ball_list):
+        for ball in ball_list:
+            if not isinstance(ball, Ball):
+                raise Exception("Must pass list of Ball objects!")
+            self.append(ball)
 
+    def move(self):
 
-		# First, make sure we don't hit the walls...
-		for ball in self:
-			ball.move()
+        for ball in self:
+            ball.move()
 
-			
+        for ball in self:
+            for other in self:
+                if ball != other and ball.intersects(other):
+                    ball.changeDirection(other)
 
-		# Iterate through all pairs of balls
-		for i in list(range( len(self) - 1 )):
-			for j in list(range(i + 1, len(self) )):
+        for ball in self:
+            ball.keepInWindow()
 
-				if self[i].intersects(self[j]):
-					if self[i].position[0] <= self[j].position[0]:
-						self[i].position[0] = self[j].position[0] - self[i].rect_size[0]
-					else:
-						self[i].position[0] = self[j].position[0] + self[j].rect_size[0]
-
-					if self[i].position[1] + self[i].rect_size[1] >= self[j].position[1]:
-						self[i].position[1] = self[j].position[1] - self[i].rect_size[1]
-					else:
-						self[i].position[1] = self[j].position[1] + self[j].rect_size[1]
-
-					self[i].reverse_direction()
-					self[j].reverse_direction()
-
-				
-
-	def draw(self):
-		for ball in self:
-			ball.draw()
-					
-
-
+    def render(self):
+        for ball in self:
+            ball.render()
