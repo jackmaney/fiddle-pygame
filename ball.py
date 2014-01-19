@@ -27,11 +27,20 @@ class Ball:
         self.screen = screen
         self.screen_size = np.array(self.screen.get_size(), np.int32)
 
-    def center(self):
+    def getCenter(self):
         return self.position + self.radius + 1
 
+    def setCenter(self, center):
+        center = np.array(center, np.int32)
+        self.position = center - self.radius - 1
+
     def distanceBetweenCenters(self, other):
-        return math.sqrt(np.vectorize(lambda x: x * x)(self.center() - other.center()).sum())
+        return math.sqrt(np.vectorize(lambda x: x * x)(self.getCenter() - other.getCenter()).sum())
+
+    def outOfBoundsCenter(self, center):
+        return center[0] - self.radius < 0 or center[1] - self.radius < 0 or \
+            center[0] + self.radius > self.screen_size[0] or \
+            center[1] + self.radius + self.rect_size[1] > self.screen_size[1]
 
     def outOfBounds(self, pos=None):
 
@@ -76,7 +85,7 @@ class Ball:
         # my reasoning and calculations here)
         #
         # Now is where we need a bit of a mathematical explanation.
-        # Denote self.center() and other.center() by C1 and C2.
+        # Denote self.getCenter() and other.getCenter() by C1 and C2.
         # Let d be the distance from C1 to C2, and let the radii of
         # self and other be r1 and r2, respectively.
         #
@@ -123,7 +132,7 @@ class Ball:
         # along the line between the centers, and in the amounts that are the distances
         # between Q and the edges of each circle (which are r1 - a and r2 - b, respectively).
         #
-        # So, we move C1 to C1 + (r1 - a)*(C2 - C1)/r1 and C2 to C2 + (r2 - b)*(C1 - C2)/r2
+        # So, we move C1 to C1 + (r1 - a)*(C1 - C2)/r1 and C2 to C2 + (r2 - b)*(C2 - C1)/r2
         #
         # Note that we've also assumed that neither of the centers are included in the other circle
         # (ie d > max(r1,r2)). We'll deal with this case--and the case of d == r1 + r2 (ie one point of
@@ -144,73 +153,73 @@ class Ball:
 
         else:
 
-            C1 = self.center().astype(float)
-            C2 = other.center().astype(float)
+            C1 = self.getCenter().astype(float)
+            C2 = other.getCenter().astype(float)
             a = float(r1 * r1 - r2 * r2 + d * d) / float(2 * d)
             b = float(r2 * r2 - r1 * r1 + d * d) / float(2 * d)
 
-            positionCandidate = self.position
-            otherPositionCandidate = other.position
+            centerCandidate = self.getCenter()
+            otherCenterCandidate = other.getCenter()
 
             if d > r1 and d > r2:
 
-                positionCandidate = np.around(
-                    C1 + (r1 - a) * (C2 - C1) / r1).astype(np.int32)
-                otherPositionCandidate = np.around(
-                    C2 + (r2 - b) * (C1 - C2) / r2).astype(np.int32)
+                centerCandidate = np.around(
+                    C1 + (r1 - a) * (C1 - C2) / r1).astype(np.int32)
+                otherCenterCandidate = np.around(
+                    C2 + (r2 - b) * (C2 - C1) / r2).astype(np.int32)
 
                 # Are these candidates in bounds?
 
-                if self.outOfBounds(otherPositionCandidate):
+                if self.outOfBoundsCenter(otherCenterCandidate):
                     # Move self the extra mile
-                    otherPositionCandidate = other.position
-                    positionCandidate += np.around((r2 - b)
-                                                   * (C2 - C1) / r2).astype(np.int32)
-                elif self.outOfBounds(positionCandidate):
+                    otherCenterCandidate = other.getCenter()
+                    centerCandidate += np.around((r2 - b)
+                                                 * (C1 - C2) / r2).astype(np.int32)
+                elif self.outOfBoundsCenter(centerCandidate):
                     # Likewise...
-                    positionCandidate = self.position
-                    otherPositionCandidate += np.around((r1 - a)
-                                                        * (C1 - C2) / r1).astype(np.int32)
+                    centerCandidate = self.getCenter()
+                    otherCenterCandidate += np.around((r1 - a)
+                                                      * (C2 - C1) / r1).astype(np.int32)
 
             elif d > r1:
                 # If this is the case, then d <= r2, which means that C2 is inside of
                 # the ball for self. We'll cheat and move other the hell out of
                 # dodge.
 
-                otherPositionCandidate = np.around(
-                    C2 + (d - r1 + r2) * (C1 - C2) / r2).astype(np.int32)
+                otherCenterCandidate = np.around(
+                    C2 + (d - r1 + r2) * (C2 - C1) / r2).astype(np.int32)
 
-                if self.outOfBounds(otherPositionCandidate):
+                if self.outOfBoundsCenter(otherCenterCandidate):
                     # Unless we can't...mumble grumble...
-                    otherPositionCandidate = other.position
+                    otherCenterCandidate = other.getCenter()
 
-                    self.position = np.around(
-                        C1 + (d - r2 + r1) * (C2 - C1) / r1).astype(np.int32)
+                    centerCandidate = np.around(
+                        C1 + (d - r2 + r1) * (C1 - C2) / r1).astype(np.int32)
 
             elif d > r2:
                 # Similar case: d <= r1, so move self the hell out of dodge
 
-                positionCandidate = np.around(
-                    C1 + (d - r2 + r1) * (C2 - C1) / r1).astype(np.int32)
+                centerCandidate = np.around(
+                    C1 + (d - r2 + r1) * (C1 - C2) / r1).astype(np.int32)
 
-                if self.outOfBounds(positionCandidate):
-                    positionCandidate = self.position
-                    otherPositionCandidate = np.around(
-                        C2 + (d - r1 + r2) * (C1 - C2) / r2).astype(np.int32)
+                if self.outOfBoundsCenter(centerCandidate):
+                    centerCandidate = self.getCenter()
+                    otherCenterCandidate = np.around(
+                        C2 + (d - r1 + r2) * (C2 - C1) / r2).astype(np.int32)
             else:
                 # If d <= r1 and d <= r2, then C1 is inside other and C2 is inside self
                 # Again, we'll cheat and move self out of dodge.
 
-                positionCandidate = np.around(
-                    C1 + (r2 - d + r1) * (C2 - C1) / r1).astype(np.int32)
+                centerCandidate = np.around(
+                    C1 + (r2 - d + r1) * (C1 - C2) / r1).astype(np.int32)
 
-                if self.outOfBounds(positionCandidate):
-                    positionCandidate = self.position
-                    otherPositionCandidate = np.around(
-                        C2 + (r1 - d + r2) * (C1 - C2) / r2).astype(np.int32)
+                if self.outOfBoundsCenter(centerCandidate):
+                    centerCandidate = self.getCenter()
+                    otherCenterCandidate = np.around(
+                        C2 + (r1 - d + r2) * (C2 - C1) / r2).astype(np.int32)
 
-            self.position = positionCandidate
-            other.position = otherPositionCandidate
+            self.setCenter(centerCandidate)
+            other.setCenter(otherCenterCandidate)
 
         # TODO: Make more realistic
 
@@ -219,7 +228,7 @@ class Ball:
 
     def render(self):
         pygame.draw.circle(self.screen, self.color,
-                           self.center(), self.radius)
+                           self.getCenter(), self.radius)
 
     def move(self):
         self.position += self.velocity
