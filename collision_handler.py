@@ -166,16 +166,17 @@ def handleCollision(ball1, ball2):
         ball1.setCenter(np.ceil(C1 + u1).astype(np.int32))
         ball2.setCenter(np.ceil(C2 + u2).astype(np.int32))
 
-    # Remember Q? That (up to a rounding error) is our point of tangency.
-    # We'll pass Q along to the changeVelocity function.
-    changeVelocity(ball1, ball2, Q)
+    # We now use the changeVelocity function to alter the velocities
+    # appropriately.
+    changeVelocity(ball1, ball2)
 
 
-def changeVelocity(ball1, ball2, tangentPoint):
+def changeVelocity(ball1, ball2):
     """
-    We're given two colliding balls and the point of tangency between them. This introduces two lines:
+    We're given two colliding balls (with any screwy overlap fixed by the handleCollision function). 
+    The circles bounding our ball have a point of tangency. We have two lines:
     
-        * The tangent line that goes through the tangentPoint and hits both of the bounding circles of 
+        * The tangent line that goes through the tangent point and hits both of the bounding circles of 
             ball1 and ball2.
 
         * The normal line that is orthogonal to the tangent line (and goes through the center of each ball).
