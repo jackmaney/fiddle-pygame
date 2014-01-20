@@ -3,6 +3,7 @@ import sys
 import math
 import random
 from ball import *
+from collision_handler import *
 
 pygame.init()
 
@@ -10,24 +11,26 @@ windowSize = (1024, 768)
 
 screen = pygame.display.set_mode(windowSize)
 
-numberOfBalls = 15
+numberOfBalls = 20
 
 ball_list = []
 
 position = [random.randint(0, windowSize[0] - 1),
             random.randint(0, windowSize[1] - 1)]
 radius = random.randint(10, 25)
+mass = math.sqrt(radius)
 color = (random.randint(0, 255),
          random.randint(0, 255), random.randint(0, 255))
-ball_list.append(Ball(screen, position, radius, color=color))
+ball_list.append(Ball(screen, position, radius, mass=mass, color=color))
 
 while len(ball_list) < numberOfBalls:
     position = [random.randint(0, windowSize[0] - 1),
                 random.randint(0, windowSize[1] - 1)]
     radius = random.randint(10, 25)
+    mass = math.sqrt(radius)
     color = (random.randint(0, 255),
              random.randint(0, 255), random.randint(0, 255))
-    ball = Ball(screen, position, radius, color=color)
+    ball = Ball(screen, position, radius, mass=mass, color=color)
     append = True
     for other in ball_list:
         if ball.intersects(other):
