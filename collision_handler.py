@@ -163,8 +163,8 @@ def handleCollision(ball1, ball2):
         u1 /= np.linalg.norm(u1)
         u2 /= np.linalg.norm(u2)
 
-        ball1.setCenter(C1 + u1)
-        ball2.setCenter(C2 + u2)
+        ball1.setCenter(np.ceil(C1 + u1).astype(np.int32))
+        ball2.setCenter(np.ceil(C2 + u2).astype(np.int32))
 
     # Remember Q? That (up to a rounding error) is our point of tangency.
     # We'll pass Q along to the changeVelocity function.
