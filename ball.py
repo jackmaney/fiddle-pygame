@@ -1,9 +1,7 @@
 import random
 import math
 import pygame
-import numpy as np
 from collision_handler import *
-import json
 
 
 class Ball:

@@ -1,9 +1,5 @@
-import pygame
 import sys
-import math
-import random
 from ball import *
-from collision_handler import *
 
 pygame.init()
 
