@@ -37,9 +37,9 @@ while True:
     displacement = mousePos - position
 
     if np.linalg.norm(displacement) > 10:
-        velocity = displacement / np.linalg.norm(displacement)
+        velocity = displacement.astype(float) / np.linalg.norm(displacement)
         velocity *= maxSpeed
-        position += velocity
+        position += np.round(velocity).astype(np.int32)
 
     screen.blit(rect, position)
 
