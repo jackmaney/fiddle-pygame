@@ -37,3 +37,5 @@ nosetests.xml
 
 # Pycharm
 .idea
+
+.DS_Store
